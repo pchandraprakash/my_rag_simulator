@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAG LAB — Retrieval-Augmented Generation Simulator</title>
+<style>
+:root{
+  --bg:#08090b;--panel:#111317;--panel2:#17191e;--line:#292c32;--text:#f4f5f6;
+  --muted:#9297a1;--red:#e82127;--red2:#ff454b;--green:#7ce0b0;--blue:#91baff;
+  --radius:16px;--mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:radial-gradient(ellipse at 50% -20%,#24262b 0%,var(--bg) 50%);color:var(--text);font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button,input,textarea,select{font:inherit}
+button{cursor:pointer}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--red);outline-offset:3px}
+a{color:inherit}
+.shell{max-width:1440px;margin:auto;padding:0 28px 48px}
+.topbar{height:76px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);gap:18px}
+.brand{display:flex;align-items:center;gap:13px;letter-spacing:.19em;font-size:12px;font-weight:800}
+.mark{width:29px;height:23px;position:relative;border-top:4px solid var(--red);border-radius:50% 50% 0 0;transform:scaleX(1.08)}
+.mark:after{content:"";position:absolute;left:5px;right:5px;top:4px;border-top:2px solid #f6f6f6}
+.top-meta{display:flex;align-items:center;gap:18px;color:var(--muted);font-size:11px;letter-spacing:.12em;text-transform:uppercase}
+.live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:7px;box-shadow:0 0 12px #7ce0b077}
+.hero{padding:44px 0 30px;display:grid;grid-template-columns:1.35fr .65fr;gap:32px;align-items:end}
+.eyebrow{font-size:10px;letter-spacing:.22em;color:var(--red2);font-weight:800;text-transform:uppercase}
+h1{font-size:clamp(34px,5vw,65px);letter-spacing:-.065em;line-height:.99;margin:14px 0 18px;font-weight:650}
+h1 span{color:#737780}
+.hero p{max-width:690px;color:#b2b6be;font-size:15px;line-height:1.7;margin:0}
+.hero-stat{border-left:1px solid var(--line);padding:6px 0 6px 24px}
+.hero-stat strong{font-size:34px;letter-spacing:-.05em;display:block}
+.hero-stat span{font-size:10px;letter-spacing:.17em;color:var(--muted);text-transform:uppercase}
+.pipeline{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px;margin:4px 0 28px}
+.step{border:1px solid var(--line);background:#0d0e11;border-radius:10px;padding:12px 10px;min-height:81px;text-align:left;color:var(--muted);transition:.2s;position:relative}
+.step .num{font:10px var(--mono);display:block;margin-bottom:10px;color:#656a74}
+.step .label{font-size:12px;color:#d8dae0;font-weight:650;display:block}
+.step.active{border-color:var(--red);background:linear-gradient(140deg,#271214,#111317 72%);box-shadow:inset 0 0 0 1px #e8212722}
+.step.active .num,.step.done .num{color:var(--red2)}
+.step.done:after{content:"✓";position:absolute;right:10px;top:9px;color:var(--green);font-size:12px}
+.layout{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(300px,.75fr);gap:18px;align-items:start}
+.panel{border:1px solid var(--line);background:linear-gradient(145deg,#14161a,#0e0f12);border-radius:var(--radius);overflow:hidden;margin-bottom:18px}
+.panel-head{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:15px}
+.panel-head h2{font-size:13px;margin:0;font-weight:700;letter-spacing:.02em}
+.panel-head p{font-size:11px;color:var(--muted);margin:4px 0 0}
+.panel-body{padding:20px}
+.pill{border:1px solid #3a3d44;border-radius:999px;padding:4px 8px;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#c6c9d0;white-space:nowrap}
+.pill.red{border-color:#803034;color:#ff7378;background:#321315}
+.btn{border:1px solid #454850;background:#202228;color:#f3f4f6;border-radius:8px;padding:10px 13px;font-size:11px;font-weight:700;letter-spacing:.04em;transition:.2s}
+.btn:hover{background:#2a2d34;border-color:#737780}
+.btn.primary{background:var(--red);border-color:var(--red);color:white}
+.btn.primary:hover{background:#ff3339}
+.btn.ghost{background:transparent}
+.btn.small{padding:7px 10px;font-size:10px}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.between{justify-content:space-between}
+.muted{color:var(--muted)}
+.smalltext{font-size:11px;color:var(--muted)}
+.field-label{display:block;color:#aeb2bb;font-size:10px;text-transform:uppercase;letter-spacing:.13em;font-weight:700;margin-bottom:8px}
+input[type=text],textarea,select{width:100%;background:#090a0c;border:1px solid #34373e;border-radius:8px;padding:12px;color:#f2f3f5;resize:vertical}
+textarea{min-height:100px;line-height:1.6}
+input[type=range]{width:100%;accent-color:var(--red)}
+select{cursor:pointer}
+.source-list{display:grid;gap:9px}
+.source{border:1px solid #2d3037;background:#0d0f12;border-radius:10px;padding:12px;display:flex;gap:12px;align-items:flex-start}
+.source input{accent-color:var(--red);margin-top:4px}
+.source-main{min-width:0;flex:1}
+.source-title{font-weight:700;font-size:12px}
+.source-meta{font-size:10px;color:var(--muted);margin:3px 0 6px}
+.source-preview{font-size:11px;color:#aeb2bb;line-height:1.55}
+.tag{display:inline-block;font:9px var(--mono);color:#d8dbe1;background:#202229;padding:3px 6px;border-radius:4px;margin-left:5px}
+.add-doc{border:1px dashed #444851;border-radius:10px;padding:13px;margin-top:12px}
+.add-doc summary{cursor:pointer;color:#d7d9df;font-size:11px;font-weight:700}
+.add-doc[open] summary{margin-bottom:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.control{margin-bottom:18px}
+.control:last-child{margin-bottom:0}
+.range-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.range-value{font:11px var(--mono);color:#f2f3f5}
+.kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:15px}
+.kpi{border:1px solid #2c2f35;background:#0b0c0e;border-radius:9px;padding:12px}
+.kpi strong{display:block;font-size:21px;letter-spacing:-.04em}
+.kpi span{display:block;color:var(--muted);font-size:9px;letter-spacing:.12em;text-transform:uppercase;margin-top:3px}
+.chunk-list{display:grid;gap:8px}
+.chunk{border:1px solid #2e3138;border-radius:9px;padding:12px;background:#0b0c0e}
+.chunk-top{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px}
+.chunk-id{font:10px var(--mono);color:var(--red2)}
+.chunk-score{font:10px var(--mono);color:var(--green)}
+.chunk p{font-size:11px;color:#c5c8cf;margin:0;line-height:1.65}
+.chunk .source-ref{font-size:9px;color:#7f8590;margin-top:8px}
+.bar{height:4px;background:#292c32;border-radius:99px;overflow:hidden;margin-top:9px}
+.bar span{height:100%;display:block;background:var(--red);border-radius:99px;transition:width .3s}
+.question-box{border:1px solid #3b3e46;border-radius:11px;background:#0a0b0d;padding:14px}
+.question-box textarea{border:0;background:transparent;padding:0;min-height:75px;outline:none}
+.question-box textarea:focus{outline:none}
+.answer{border:1px solid #33363e;border-radius:10px;padding:15px;background:#0a0b0d;line-height:1.75;font-size:12px;color:#e1e3e8;white-space:pre-wrap}
+.answer strong{color:#fff}
+.citation{display:inline-block;color:#ff8589;border:1px solid #6e3034;background:#281315;border-radius:4px;padding:0px 5px;font:10px var(--mono);margin:0 2px}
+.prompt-preview{font:11px/1.7 var(--mono);white-space:pre-wrap;color:#c6cad3;background:#090a0c;border:1px solid #2d3037;border-radius:9px;padding:14px;overflow-wrap:anywhere}
+.timeline{display:grid;gap:10px}
+.timeline-item{display:grid;grid-template-columns:26px 1fr;gap:10px;align-items:start}
+.timeline-icon{height:24px;width:24px;border-radius:7px;background:#25272e;display:grid;place-items:center;font-size:10px;color:#e5e6e9}
+.timeline-item p{margin:0;font-size:11px;color:#b4b8c0;line-height:1.55}
+.timeline-item strong{display:block;color:#f1f2f4;margin-bottom:2px;font-size:11px}
+.empty{padding:25px 12px;text-align:center;color:#777d87;font-size:11px;border:1px dashed #30333a;border-radius:9px}
+.status{display:flex;align-items:center;gap:7px;font-size:10px;color:var(--muted)}
+.status:before{content:"";width:6px;height:6px;background:#666;border-radius:50%}
+.status.ready:before{background:var(--green);box-shadow:0 0 10px #7ce0b066}
+.footer{border-top:1px solid var(--line);padding-top:18px;margin-top:12px;display:flex;justify-content:space-between;gap:20px;color:#777d87;font-size:10px;line-height:1.6}
+.toast{position:fixed;bottom:20px;left:50%;transform:translate(-50%,20px);opacity:0;pointer-events:none;background:#f4f5f6;color:#08090b;padding:10px 15px;border-radius:7px;font-size:11px;font-weight:700;transition:.25s;z-index:20}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+@media(max-width:950px){.hero{grid-template-columns:1fr}.hero-stat{display:none}.layout{grid-template-columns:1fr}.pipeline{grid-template-columns:repeat(4,minmax(0,1fr))}.step{min-height:70px}}
+@media(max-width:560px){.shell{padding:0 14px 30px}.topbar{height:62px}.top-meta{gap:8px;font-size:9px}.hero{padding:32px 0 24px}.pipeline{grid-template-columns:repeat(2,minmax(0,1fr))}.panel-body{padding:14px}.panel-head{padding:15px}.grid2{grid-template-columns:1fr}.kpi-grid{grid-template-columns:repeat(3,1fr)}.kpi{padding:9px}.kpi strong{font-size:18px}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="topbar">
+    <div class="brand"><div class="mark"></div><span>RAG <span style="color:#858a94">/</span> LAB</span></div>
+    <div class="top-meta"><span><i class="live-dot"></i>LOCAL SIMULATION</span><span>v1.0</span></div>
+  </header>
+
+  <section class="hero">
+    <div>
+      <div class="eyebrow">Retrieval-augmented generation / interactive lab</div>
+      <h1>Make AI answers<br><span>traceable to data.</span></h1>
+      <p>Explore how documents become searchable knowledge, how a question retrieves relevant passages, and how those passages help a language model answer with evidence.</p>
+    </div>
+    <div class="hero-stat"><strong id="heroChunks">00</strong><span>Indexed text chunks</span><div style="height:18px"></div><strong id="heroSources">00</strong><span>Selected source documents</span></div>
+  </section>
+
+  <nav class="pipeline" aria-label="RAG pipeline steps">
+    <button class="step active" data-step="0"><span class="num">01 / INGEST</span><span class="label">Collect data</span></button>
+    <button class="step" data-step="1"><span class="num">02 / CHUNK</span><span class="label">Split text</span></button>
+    <button class="step" data-step="2"><span class="num">03 / INDEX</span><span class="label">Embed & store</span></button>
+    <button class="step" data-step="3"><span class="num">04 / RETRIEVE</span><span class="label">Find context</span></button>
+    <button class="step" data-step="4"><span class="num">05 / AUGMENT</span><span class="label">Build prompt</span></button>
+    <button class="step" data-step="5"><span class="num">06 / GENERATE</span><span class="label">Answer</span></button>
+    <button class="step" data-step="6"><span class="num">07 / EVALUATE</span><span class="label">Check quality</span></button>
+  </nav>
+
+  <div class="layout">
+    <main>
+      <section class="panel" id="ingestPanel">
+        <div class="panel-head"><div><h2>01 — Knowledge sources</h2><p>Select documents that the system is allowed to use.</p></div><span class="pill">Ingestion</span></div>
+        <div class="panel-body">
+          <div class="kpi-grid">
+            <div class="kpi"><strong id="sourceCount">4</strong><span>Sources selected</span></div>
+            <div class="kpi"><strong id="wordCount">—</strong><span>Approx. words</span></div>
+            <div class="kpi"><strong id="docTypes">4</strong><span>Data formats</span></div>
+          </div>
+          <div class="source-list" id="sourceList"></div>
+          <details class="add-doc">
+            <summary>＋ Add your own text document</summary>
+            <div class="control"><label class="field-label" for="customTitle">Document title</label><input id="customTitle" type="text" placeholder="e.g. Biology lab notes"></div>
+            <div class="control"><label class="field-label" for="customType">Source type</label><select id="customType"><option>Text file</option><option>PDF</option><option>DOCX</option><option>Web page</option><option>API response</option></select></div>
+            <div class="control"><label class="field-label" for="customText">Document contents</label><textarea id="customText" placeholder="Paste a few paragraphs here..."></textarea></div>
+            <button class="btn" id="addSourceBtn">ADD DOCUMENT</button>
+          </details>
+          <div class="row between" style="margin-top:17px"><span class="smalltext">In real systems, parsing and cleaning happen before chunking.</span><button class="btn primary" id="ingestBtn">INGEST SELECTED →</button></div>
+        </div>
+      </section>
+
+      <section class="panel" id="chunkPanel">
+        <div class="panel-head"><div><h2>02 — Chunking strategy</h2><p>Choose how source text is divided into retrievable passages.</p></div><span class="pill">Pre-processing</span></div>
+        <div class="panel-body">
+          <div class="grid2">
+            <div class="control"><label class="field-label" for="chunkMode">Chunking method</label><select id="chunkMode"><option value="paragraph">Paragraph-aware</option><option value="fixed">Fixed word window</option><option value="sentence">Sentence-aware</option></select></div>
+            <div class="control"><label class="field-label" for="chunkSize">Target chunk size</label><select id="chunkSize"><option value="45">Small · ~45 words</option><option value="80" selected>Medium · ~80 words</option><option value="130">Large · ~130 words</option></select></div>
+          </div>
+          <div class="control"><div class="range-head"><label class="field-label" for="overlap">Chunk overlap</label><span class="range-value"><span id="overlapVal">12</span> words</span></div><input id="overlap" type="range" min="0" max="30" step="3" value="12"><div class="row between smalltext"><span>No overlap</span><span>More context retained</span></div></div>
+          <div class="row between" style="margin:15px 0"><span class="smalltext">Overlap can preserve context at boundaries, but adds storage and duplicate text.</span><button class="btn" id="chunkBtn">GENERATE CHUNKS</button></div>
+          <div class="kpi-grid"><div class="kpi"><strong id="chunkCount">0</strong><span>Chunks created</span></div><div class="kpi"><strong id="avgWords">0</strong><span>Avg. words / chunk</span></div><div class="kpi"><strong id="overlapPct">0%</strong><span>Overlap setting</span></div></div>
+          <div class="chunk-list" id="chunkList"><div class="empty">Ingest sources, then generate chunks to inspect the results.</div></div>
+          <div class="row" style="margin-top:12px;justify-content:flex-end"><button class="btn primary" id="indexBtn">EMBED & INDEX →</button></div>
+        </div>
+      </section>
+
+      <section class="panel" id="retrievePanel">
+        <div class="panel-head"><div><h2>03 — Ask a question</h2><p>The query is compared with indexed chunks to find likely evidence.</p></div><span class="pill">Retrieval</span></div>
+        <div class="panel-body">
+          <div class="question-box"><label class="field-label" for="question">User query</label><textarea id="question">What are the key steps of photosynthesis, and what does a plant need for it?</textarea><div class="row between"><span class="smalltext">Try a question that can be answered from the selected documents.</span><button class="btn primary" id="retrieveBtn">RETRIEVE CONTEXT →</button></div></div>
+          <div class="grid2" style="margin-top:16px">
+            <div class="control"><label class="field-label" for="retrievalMode">Similarity method</label><select id="retrievalMode"><option value="semantic">Semantic-like (simulated)</option><option value="keyword">Keyword overlap</option></select></div>
+            <div class="control"><label class="field-label" for="topK">Top-K results</label><select id="topK"><option value="2">2 chunks</option><option value="3" selected>3 chunks</option><option value="5">5 chunks</option></select></div>
+          </div>
+          <div class="row between" style="margin:8px 0 12px"><span class="smalltext">Scores are illustrative, not real vector similarity.</span><span class="status" id="indexStatus">Index not built</span></div>
+          <div class="chunk-list" id="retrievalList"><div class="empty">Build the index, then retrieve evidence for your question.</div></div>
+        </div>
+      </section>
+
+      <section class="panel" id="augmentPanel">
+        <div class="panel-head"><div><h2>04 — Prompt augmentation</h2><p>Retrieved passages are inserted into a structured prompt.</p></div><span class="pill">Context assembly</span></div>
+        <div class="panel-body">
+          <div class="prompt-preview" id="promptPreview">Your augmented prompt will appear here after retrieval.</div>
+          <div class="row between" style="margin-top:12px"><span class="smalltext">The context window has limits; more text isn't always better.</span><button class="btn" id="copyPromptBtn">COPY PROMPT</button></div>
+        </div>
+      </section>
+
+      <section class="panel" id="generatePanel">
+        <div class="panel-head"><div><h2>05 — Generate a grounded answer</h2><p>Simulate a response that uses retrieved context and cites evidence.</p></div><span class="pill">Generation</span></div>
+        <div class="panel-body">
+          <div class="grid2">
+            <div class="control"><label class="field-label" for="answerStyle">Answer style</label><select id="answerStyle"><option value="concise">Concise</option><option value="detailed">Detailed explanation</option><option value="bullets">Bullet points</option></select></div>
+            <div class="control"><label class="field-label" for="grounding">Grounding behavior</label><select id="grounding"><option value="strict">Strict — say when evidence is missing</option><option value="balanced">Balanced — explain with caveats</option></select></div>
+          </div>
+          <div class="row between" style="margin-bottom:12px"><span class="smalltext">A real LLM may still make mistakes even with relevant context.</span><button class="btn primary" id="generateBtn">GENERATE ANSWER →</button></div>
+          <div id="answerBox" class="answer">Your generated answer will appear here. First retrieve context from the knowledge base.</div>
+        </div>
+      </section>
+
+      <section class="panel" id="evaluatePanel">
+        <div class="panel-head"><div><h2>06 — Evaluate the run</h2><p>Inspect the retrieval and answer quality, not just whether the answer sounds fluent.</p></div><span class="pill">Quality checks</span></div>
+        <div class="panel-body">
+          <div class="kpi-grid">
+            <div class="kpi"><strong id="evalRel">—</strong><span>Retrieval relevance</span></div>
+            <div class="kpi"><strong id="evalCoverage">—</strong><span>Evidence coverage</span></div>
+            <div class="kpi"><strong id="evalGround">—</strong><span>Grounding signal</span></div>
+          </div>
+          <div class="timeline" id="evalNotes"><div class="timeline-item"><div class="timeline-icon">i</div><p><strong>Evaluation not run</strong>Generate an answer to see a heuristic assessment of the current run.</p></div></div>
+          <div class="row between" style="margin-top:16px"><span class="smalltext">These are teaching heuristics, not a validated evaluation benchmark.</span><button class="btn" id="resetBtn">RESET LAB</button></div>
+        </div>
+      </section>
+    </main>
+
+    <aside>
+      <section class="panel">
+        <div class="panel-head"><div><h2>Pipeline telemetry</h2><p>Live state of this local simulation.</p></div><span class="pill red">RAG / 07</span></div>
+        <div class="panel-body">
+          <div class="timeline" id="telemetry">
+            <div class="timeline-item"><div class="timeline-icon">01</div><p><strong>Source ingestion</strong>Waiting for selected documents.</p></div>
+            <div class="timeline-item"><div class="timeline-icon">02</div><p><strong>Chunk creation</strong>Text segments have not been generated.</p></div>
+            <div class="timeline-item"><div class="timeline-icon">03</div><p><strong>Vector index</strong>No embeddings stored yet.</p></div>
+            <div class="timeline-item"><div class="timeline-icon">04</div><p><strong>Retrieval</strong>No query executed.</p></div>
+            <div class="timeline-item"><div class="timeline-icon">05</div><p><strong>Generation</strong>No answer generated.</p></div>
+          </div>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><div><h2>Concept, in 30 seconds</h2><p>Why RAG exists.</p></div></div>
+        <div class="panel-body">
+          <div class="timeline">
+            <div class="timeline-item"><div class="timeline-icon">A</div><p><strong>LLM alone</strong>Answers from learned parameters; may not know private, current, or niche information.</p></div>
+            <div class="timeline-item"><div class="timeline-icon">B</div><p><strong>RAG retrieves</strong>Searches your knowledge base for passages relevant to the question.</p></div>
+            <div class="timeline-item"><div class="timeline-icon">C</div><p><strong>Context grounds</strong>Relevant passages are supplied to the model as evidence for its answer.</p></div>
+            <div class="timeline-item"><div class="timeline-icon">D</div><p><strong>Evaluate</strong>Check whether the right evidence was found and the answer faithfully used it.</p></div>
+          </div>
+          <div style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px"><span class="field-label">Key distinction</span><p style="font-size:12px;color:#c4c7ce;margin:0;line-height:1.7">RAG usually does <strong>not</strong> retrain the LLM. It retrieves external information at answer time and places it in the prompt.</p></div>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><div><h2>Try these queries</h2><p>Explore what retrieval can and cannot find.</p></div></div>
+        <div class="panel-body" style="display:grid;gap:8px">
+          <button class="btn ghost sample-query" data-query="What are the key steps of photosynthesis, and what does a plant need for it?">01 / Photosynthesis basics</button>
+          <button class="btn ghost sample-query" data-query="How does spaced repetition help students remember information?">02 / Study techniques</button>
+          <button class="btn ghost sample-query" data-query="What is the school policy for submitting a late assignment?">03 / Missing evidence</button>
+          <button class="btn ghost sample-query" data-query="What is the difference between RAG and fine-tuning?">04 / Outside the documents</button>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><div><h2>Glossary</h2></div></div>
+        <div class="panel-body" style="display:grid;gap:12px">
+          <p class="smalltext"><strong style="color:#f3f4f6">Chunk</strong> — a small retrievable segment of a document.</p>
+          <p class="smalltext"><strong style="color:#f3f4f6">Embedding</strong> — a numeric representation that can encode meaning.</p>
+          <p class="smalltext"><strong style="color:#f3f4f6">Vector store</strong> — an index for finding similar embeddings.</p>
+          <p class="smalltext"><strong style="color:#f3f4f6">Top-K</strong> — the K highest-ranked retrieved chunks.</p>
+          <p class="smalltext"><strong style="color:#f3f4f6">Grounding</strong> — how well an answer is supported by its evidence.</p>
+        </div>
+      </section>
+    </aside>
+  </div>
+  <footer class="footer"><span>RAG LAB · EDUCATIONAL SIMULATOR<br>All processing runs locally in this browser tab.</span><span>NO API KEY · NO BACKEND · NO DATA UPLOAD<br>Illustrative retrieval and answer generation.</span></footer>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+(() => {
+"use strict";
+const $ = id => document.getElementById(id);
+const sources = [
+ {id:"D01",title:"Biology Notes — Photosynthesis",type:"PDF",selected:true,text:"Photosynthesis is the process by which green plants, algae, and some bacteria convert light energy into chemical energy. In plants, it mainly takes place in chloroplasts, which contain the green pigment chlorophyll. During the light-dependent reactions, chlorophyll absorbs sunlight and water molecules are split, releasing oxygen. The process produces energy-carrying molecules used in the next stage. In the Calvin cycle, carbon dioxide is used to build sugars such as glucose. The overall process needs light, water, and carbon dioxide. Glucose stores energy for growth and other cellular activities, while oxygen is released as a by-product. Factors such as light intensity, carbon dioxide concentration, temperature, and water availability can affect the rate of photosynthesis."},
+ {id:"D02",title:"Study Skills — Spaced Repetition",type:"DOCX",selected:true,text:"Spaced repetition is a study technique that schedules review sessions over increasing intervals of time. Instead of cramming the night before a test, students revisit information after a short delay, then again after longer delays. This helps strengthen long-term memory and makes it easier to retrieve information later. Active recall works well with spaced repetition: close the notes and try to answer a question from memory before checking the answer. A practical routine is to review new material the same day, revisit it the next day, then several days later, and again before an assessment. Short, focused sessions are often more manageable than one long session. Students should adjust the schedule based on how difficult the material feels."},
+ {id:"D03",title:"Chemistry Lab — Safe Practice",type:"PDF",selected:true,text:"Before beginning a chemistry lab, read the procedure and identify possible hazards. Wear splash goggles, appropriate protective clothing, and closed-toe shoes. Tie back long hair and keep bags away from work areas. Never taste chemicals, and do not smell a substance directly; use the wafting method only when instructed by the teacher. Label containers clearly and follow the teacher's directions for disposal. If a spill, breakage, or injury occurs, alert the teacher immediately. Record observations carefully in the lab notebook, including measurements, units, and unexpected results. In the conclusion, explain whether the evidence supports the hypothesis and note possible sources of experimental error."},
+ {id:"D04",title:"Classroom Guide — Homework Planning",type:"Web page",selected:true,text:"A useful homework plan starts by listing each assignment, its due date, and the estimated time required. Break large projects into smaller actions such as research, outlining, drafting, and editing. Prioritize urgent tasks while leaving time for difficult work. If instructions are unclear, ask the teacher or a classmate a specific question early rather than waiting until the due date. After completing work, check the rubric and proofread before submitting. Keep digital files organized with descriptive names and save a backup. This guide does not specify a school-wide late-work policy; students should consult the syllabus or ask their teacher for that information."}
+];
+let customId=5, chunks=[], indexed=false, retrieved=[], currentAnswer="", generated=false, stepDone=new Set();
+const stopWords = new Set("the a an and or is are was were be to of in for on with how what does do can by from as it this that into about after before then than your their they them which when where why using used use".split(" "));
+function words(t){return (t.toLowerCase().match(/[a-z0-9]+(?:'[a-z]+)?/g)||[]).filter(w=>!stopWords.has(w))}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function notify(msg){const el=$("toast");el.textContent=msg;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),2100)}
+function selectedSources(){return sources.filter(s=>s.selected)}
+function renderSources(){
+ $("sourceList").innerHTML=sources.map(s=>`<label class="source"><input type="checkbox" data-source="${s.id}" ${s.selected?"checked":""}><div class="source-main"><div class="source-title">${esc(s.title)} <span class="tag">${esc(s.type)}</span></div><div class="source-meta">${s.id} · ${words(s.text).length} words</div><div class="source-preview">${esc(s.text.slice(0,155))}${s.text.length>155?"…":""}</div></div></label>`).join("");
+ $("sourceList").querySelectorAll("input").forEach(inp=>inp.addEventListener("change",()=>{const s=sources.find(x=>x.id===inp.dataset.source);s.selected=inp.checked;updateCounts();}));
+ updateCounts();
+}
+function updateCounts(){
+ const ss=selectedSources();$("sourceCount").textContent=ss.length;$("heroSources").textContent=String(ss.length).padStart(2,"0");
+ $("wordCount").textContent=ss.reduce((n,s)=>n+words(s.text).length,0).toLocaleString();
+ $("docTypes").textContent=new Set(ss.map(s=>s.type)).size;
+ $("heroChunks").textContent=String(chunks.length).padStart(2,"0");
+}
+function setDone(n){stepDone.add(n);document.querySelectorAll(".step").forEach(b=>{const i=+b.dataset.step;b.classList.toggle("done",stepDone.has(i));b.classList.toggle("active",i===n)});}
+document.querySelectorAll(".step").forEach(b=>b.addEventListener("click",()=>{const ids=["ingestPanel","chunkPanel","chunkPanel","retrievePanel","augmentPanel","generatePanel","evaluatePanel"];$(ids[+b.dataset.step]).scrollIntoView({behavior:"smooth",block:"start"});document.querySelectorAll(".step").forEach(x=>x.classList.toggle("active",x===b))}));
+$("addSourceBtn").addEventListener("click",()=>{
+ const title=$("customTitle").value.trim()||`Custom document ${customId-4}`,text=$("customText").value.trim();
+ if(text.length<20){notify("Add at least a sentence or two first.");return}
+ sources.push({id:`D${String(customId++).padStart(2,"0")}`,title,type:$("customType").value,selected:true,text});
+ $("customTitle").value="";$("customText").value="";renderSources();notify("Document added to the source list.");
+});
+$("ingestBtn").addEventListener("click",()=>{
+ if(!selectedSources().length){notify("Select at least one source.");return}
+ chunks=[];indexed=false;retrieved=[];generated=false;currentAnswer="";
+ $("chunkList").innerHTML='<div class="empty">Sources ingested. Generate chunks to inspect the segments.</div>';
+ $("retrievalList").innerHTML='<div class="empty">Create the index, then retrieve evidence.</div>';
+ $("promptPreview").textContent="Your augmented prompt will appear here after retrieval.";
+ $("answerBox").textContent="Your generated answer will appear here. First retrieve context from the knowledge base.";
+ $("indexStatus").textContent="Index not built";$("indexStatus").className="status";
+ updateCounts();setDone(0);updateTelemetry(0);
+ notify(`${selectedSources().length} source(s) ingested.`);
+});
+$("overlap").addEventListener("input",()=> $("overlapVal").textContent=$("overlap").value);
+function splitText(text,mode,size,overlap){
+ const toks=text.match(/\S+/g)||[];if(!toks.length)return [];
+ if(mode==="paragraph"){
+   const paras=text.split(/\n+/).map(p=>p.trim()).filter(Boolean);
+   if(paras.length>1)return windowByWords(toks,size,overlap,paras);
+ }
+ if(mode==="sentence"){
+   const sentences=text.match(/[^.!?]+[.!?]+|[^.!?]+$/g)||[text];let out=[],buf=[];
+   for(const s of sentences){const sw=s.trim().split(/\s+/);if(buf.length&&buf.length+sw.length>size){out.push(buf.join(" "));const carry=buf.slice(Math.max(0,buf.length-overlap));buf=carry.concat(sw)}else buf=buf.concat(sw)}
+   if(buf.length)out.push(buf.join(" "));return out;
+ }
+ return windowByWords(toks,size,overlap);
+}
+function windowByWords(toks,size,overlap,paras){
+ // Paragraph-aware mode tries to preserve paragraph boundaries; long paragraphs are windowed.
+ if(paras){
+  const out=[];let buf=[];
+  for(const p of paras){const pt=p.split(/\s+/);if(buf.length&&buf.length+pt.length>size){out.push(buf.join(" "));buf=buf.slice(Math.max(0,buf.length-overlap))}
+   if(pt.length>size){buf=buf.concat(pt);while(buf.length>size){out.push(buf.slice(0,size).join(" "));buf=buf.slice(Math.max(1,size-overlap))}}
+   else buf=buf.concat(pt);
+  }if(buf.length)out.push(buf.join(" "));return out;
+ }
+ const out=[];let start=0;while(start<toks.length){out.push(toks.slice(start,start+size).join(" "));if(start+size>=toks.length)break;start+=Math.max(1,size-overlap)}return out;
+}
+$("chunkBtn").addEventListener("click",()=>{
+ const ss=selectedSources();if(!ss.length){notify("Ingest at least one selected source first.");return}
+ const size=+$("chunkSize").value,overlap=+$("overlap").value,mode=$("chunkMode").value;
+ chunks=[];
+ ss.forEach(s=>splitText(s.text,mode,size,overlap).forEach((txt,i)=>chunks.push({id:`C${String(chunks.length+1).padStart(3,"0")}`,source:s.id,title:s.title,text:txt,words:words(txt).length,vector:null})));
+ indexed=false;retrieved=[];generated=false;
+ $("chunkCount").textContent=chunks.length;$("avgWords").textContent=chunks.length?Math.round(chunks.reduce((n,c)=>n+c.words,0)/chunks.length):0;$("overlapPct").textContent=`${overlap}w`;
+ $("chunkList").innerHTML=chunks.slice(0,8).map(c=>`<article class="chunk"><div class="chunk-top"><span class="chunk-id">${c.id} <span class="tag">${c.source}</span></span><span class="pill">${c.words} words</span></div><p>${esc(c.text)}</p><div class="source-ref">SOURCE: ${esc(c.title)}</div></article>`).join("")+(chunks.length>8?`<div class="smalltext" style="text-align:center;padding:8px">Showing 8 of ${chunks.length} chunks.</div>`:"");
+ $("retrievalList").innerHTML='<div class="empty">Index these chunks before retrieval.</div>';updateCounts();setDone(1);updateTelemetry(1);
+ notify(`${chunks.length} chunks created.`);
+});
+function hashEmbedding(text){
+ // Tiny deterministic feature vector for demonstration only — not a real neural embedding.
+ const v=new Array(48).fill(0);
+ for(const w of words(text)){let h=2166136261;for(let i=0;i<w.length;i++){h^=w.charCodeAt(i);h=Math.imul(h,16777619)}h>>>=0;v[h%48]+=1;v[(h>>>8)%48]+=.35;}
+ const norm=Math.sqrt(v.reduce((n,x)=>n+x*x,0))||1;return v.map(x=>x/norm);
+}
+function cosine(a,b){return a.reduce((n,x,i)=>n+x*b[i],0)}
+$("indexBtn").addEventListener("click",()=>{
+ if(!chunks.length){notify("Generate chunks first.");return}
+ chunks.forEach(c=>c.vector=hashEmbedding(c.text));indexed=true;retrieved=[];generated=false;
+ $("indexStatus").textContent=`${chunks.length} chunks indexed`; $("indexStatus").className="status ready";
+ setDone(2);updateTelemetry(2);notify("Toy embeddings created and indexed.");
+});
+function rankChunks(q){
+ const qWords=words(q),qSet=new Set(qWords),qv=hashEmbedding(q);
+ return chunks.map(c=>{
+   const cw=words(c.text),cset=new Set(cw);
+   const overlap=qWords.length?qWords.filter(w=>cset.has(w)).length/qWords.length:0;
+   const cos=c.vector?cosine(qv,c.vector):0;
+   // Blend hashed-vector similarity with lexical overlap to make the toy ranking easier to inspect.
+   let raw=$("retrievalMode").value==="keyword"?overlap:(Math.max(0,cos)*.68+overlap*.32);
+   const queryPhrase=qWords.filter(w=>w.length>4);
+   const phraseBonus=queryPhrase.some(w=>cset.has(w))?.08:0;
+   const score=Math.min(.99,raw+phraseBonus);
+   return {...c,score,overlap};
+ }).sort((a,b)=>b.score-a.score).slice(0,+$("topK").value);
+}
+$("retrieveBtn").addEventListener("click",()=>{
+ const q=$("question").value.trim();if(!q){notify("Enter a question first.");return}
+ if(!indexed){notify("Click Embed & Index before retrieval.");return}
+ retrieved=rankChunks(q);generated=false;currentAnswer="";
+ $("retrievalList").innerHTML=retrieved.map((c,i)=>`<article class="chunk"><div class="chunk-top"><span class="chunk-id">RANK ${String(i+1).padStart(2,"0")} · ${c.id}</span><span class="chunk-score">${Math.round(c.score*100)}% match*</span></div><p>${esc(c.text)}</p><div class="bar"><span style="width:${Math.round(c.score*100)}%"></span></div><div class="source-ref">SOURCE: ${esc(c.title)} · lexical overlap ${Math.round(c.overlap*100)}%</div></article>`).join("")||'<div class="empty">No chunks available.</div>';
+ $("promptPreview").textContent=buildPrompt(q);
+ $("answerBox").textContent="Context retrieved. Generate an answer to see how it uses this evidence.";
+ setDone(3);updateTelemetry(3);setDone(4);notify(`Retrieved top ${retrieved.length} chunks.`);
+});
+function buildPrompt(q){
+ return `SYSTEM:\nAnswer the user's question using the provided context. If the context does not contain enough evidence, say what is missing. Do not invent citations.\n\nRETRIEVED CONTEXT:\n${retrieved.map((c,i)=>`[${i+1}] Source: ${c.title} (${c.id})\n${c.text}`).join("\n\n")||"(No context retrieved yet.)"}\n\nUSER QUESTION:\n${q}\n\nINSTRUCTION:\nWrite a clear answer. Cite supporting passages using [1], [2], etc. Distinguish sourced facts from uncertainty.`;
+}
+$("copyPromptBtn").addEventListener("click",async()=>{
+ const txt=$("promptPreview").textContent;if(!txt||txt.startsWith("Your augmented")){notify("Retrieve context before copying the prompt.");return}
+ try{await navigator.clipboard.writeText(txt);notify("Prompt copied.")}catch(e){notify("Clipboard unavailable. Select and copy the prompt text manually.")}
+});
+function answerFromEvidence(q,items,style,grounding){
+ const qws=words(q),qset=new Set(qws);
+ const scored=items.map(c=>({...c,match:words(c.text).filter(w=>qset.has(w)).length})).sort((a,b)=>b.match-a.match);
+ const relevant=scored.filter(c=>c.match>0);
+ if(!relevant.length||relevant[0].score<.08){
+  return grounding==="strict"?"I can’t answer this reliably from the retrieved documents. The current context does not provide clear supporting evidence for this question. Try adding a relevant source or asking a question covered by the knowledge base.":"The retrieved documents do not appear to contain a direct answer. I would need a more relevant source to respond confidently.";
+ }
+ const allText=relevant.map(c=>c.text).join(" ").toLowerCase();
+ const citations=relevant.slice(0,Math.min(3,relevant.length)).map(c=>`[${items.indexOf(c)+1>0?items.indexOf(c)+1:1}]`).join(" ");
+ let pieces=[];
+ if(/photosynth|plant|chlorophyll|carbon dioxide|glucose|oxygen|light/.test(q.toLowerCase())){
+  const bio=relevant.filter(c=>/photosynth|chlorophyll|carbon dioxide|glucose/.test(c.text.toLowerCase()));
+  if(bio.length){
+   const t=bio.map(c=>c.text).join(" ").toLowerCase();
+   pieces.push("Photosynthesis is how plants convert light energy into chemical energy. It mainly takes place in chloroplasts, where chlorophyll absorbs sunlight.");
+   if(/water|oxygen/.test(t))pieces.push("In the light-dependent reactions, water is split and oxygen is released.");
+   if(/calvin cycle|carbon dioxide|glucose/.test(t))pieces.push("During the Calvin cycle, carbon dioxide is used to build sugars such as glucose.");
+   if(/light, water, and carbon dioxide/.test(t)||(/water/.test(t)&&/carbon dioxide/.test(t)))pieces.push("The key inputs are light, water, and carbon dioxide; glucose stores energy, and oxygen is a by-product.");
+  }
+ } else if(/spaced repetition|remember|memory|study technique|study/.test(q.toLowerCase())){
+  pieces.push("Spaced repetition means reviewing information at increasing intervals rather than cramming in one session. Pairing it with active recall—trying to answer from memory before checking notes—can strengthen long-term retention.");
+  pieces.push("A practical routine is to review material the same day, again the next day, then several days later and before an assessment.");
+ } else if(/chemistry|lab|safety|goggles|experiment/.test(q.toLowerCase())){
+  pieces.push("Before a chemistry lab, read the procedure, identify hazards, wear appropriate protective equipment, and follow the teacher’s disposal instructions.");
+  pieces.push("Record observations, measurements, and units carefully. If there is a spill, breakage, or injury, alert the teacher immediately.");
+ } else if(/homework|assignment|late|due date|submit/.test(q.toLowerCase())){
+  pieces.push("The guide recommends listing assignments with due dates and estimated effort, breaking large projects into smaller tasks, and checking the rubric before submitting.");
+  if(/late|policy/.test(q.toLowerCase()))pieces.push("The documents do not specify a school-wide late-work policy. Check the syllabus or ask the teacher for the applicable rule.");
+ } else {
+  const sentence= relevant[0].text.split(/(?<=[.!?])\s+/).slice(0,style==="detailed"?3:2).join(" ");
+  pieces.push(sentence);
+  if(style==="detailed"&&relevant[1])pieces.push("Additional retrieved context: "+relevant[1].text.split(/(?<=[.!?])\s+/).slice(0,2).join(" "));
+ }
+ const citeList=relevant.slice(0,Math.min(3,relevant.length)).map(c=>`[${c.id}: ${c.title}]`).join(" ");
+ let body=pieces.join(" ");
+ if(style==="bullets")body="• "+pieces.join("\n• ");
+ else if(style==="concise")body=pieces.slice(0,2).join(" ");
+ if(grounding==="balanced"&&relevant.length===1)body+=" This answer is based on a limited set of retrieved passages, so verify details against the original source.";
+ return body+"\n\nEvidence: "+citeList;
+}
+$("generateBtn").addEventListener("click",()=>{
+ if(!retrieved.length){notify("Retrieve context first.");return}
+ currentAnswer=answerFromEvidence($("question").value,retrieved,$("answerStyle").value,$("grounding").value);generated=true;
+ $("answerBox").textContent=currentAnswer;
+ setDone(5);updateTelemetry(4);evaluate();setDone(6);
+ notify("Grounded-answer simulation complete.");
+});
+function evaluate(){
+ const scores=retrieved.map(c=>c.score),avg=scores.length?scores.reduce((a,b)=>a+b,0)/scores.length:0;
+ const queryTerms=words($("question").value),contextTerms=new Set(retrieved.flatMap(c=>words(c.text)));
+ const coverage=queryTerms.length?queryTerms.filter(w=>contextTerms.has(w)).length/queryTerms.length:0;
+ const grounded=generated&&retrieved.length&&currentAnswer.includes("Evidence:")&&!/can’t answer|do not appear to contain/i.test(currentAnswer);
+ $("evalRel").textContent=retrieved.length?`${Math.round(avg*100)}%`:"—";
+ $("evalCoverage").textContent=retrieved.length?`${Math.round(coverage*100)}%`:"—";
+ $("evalGround").textContent=generated?(grounded?"Likely":"Review"):"—";
+ const notes=[
+  ["Retrieval relevance",avg>.25?"Some retrieved chunks appear related to the query. Inspect each passage; a high toy score is not proof of relevance.":"The top results may be weak. Try different wording, a different retrieval mode, or better source coverage."],
+  ["Context coverage",coverage>.5?"The retrieved context contains many of the query's content words. Word overlap does not guarantee that it answers the question.":"Several query concepts may be missing from the context. Consider increasing Top-K or adding documents."],
+  ["Grounding and faithfulness",grounded?"The answer includes evidence references. In a real system, verify each factual claim against its cited passage.":"The answer may be insufficiently supported or may correctly report missing evidence. Check citations and source text."]
+ ];
+ $("evalNotes").innerHTML=notes.map((n,i)=>`<div class="timeline-item"><div class="timeline-icon">${i+1}</div><p><strong>${n[0]}</strong>${n[1]}</p></div>`).join("");
+ updateTelemetry(4);
+}
+function updateTelemetry(level){
+ const ss=selectedSources();
+ const items=[
+  ["01","Source ingestion",ss.length?`${ss.length} selected source(s) available to the pipeline.`:"No sources selected."],
+  ["02","Chunk creation",chunks.length?`${chunks.length} text segments created using ${$("chunkMode").value} chunking.`:"Text segments have not been generated."],
+  ["03","Vector index",indexed?`Toy feature vectors stored for ${chunks.length} chunks.`:"No embeddings stored yet."],
+  ["04","Retrieval",retrieved.length?`${retrieved.length} top-ranked passages selected for this query.`:"No query evidence selected."],
+  ["05","Generation",generated?"Answer generated with an evidence list.":"No answer generated."]
+ ];
+ $("telemetry").innerHTML=items.map((x,i)=>`<div class="timeline-item"><div class="timeline-icon">${x[0]}</div><p><strong>${x[1]}</strong>${x[2]}</p></div>`).join("");
+}
+document.querySelectorAll(".sample-query").forEach(b=>b.addEventListener("click",()=>{$("question").value=b.dataset.query;$("question").focus();notify("Sample question loaded.");}));
+$("resetBtn").addEventListener("click",()=>{
+ sources.forEach(s=>{if(s.id.startsWith("D0"))s.selected=true});chunks=[];indexed=false;retrieved=[];generated=false;currentAnswer="";stepDone.clear();
+ $("chunkList").innerHTML='<div class="empty">Ingest sources, then generate chunks to inspect the results.</div>';
+ $("retrievalList").innerHTML='<div class="empty">Build the index, then retrieve evidence for your question.</div>';
+ $("promptPreview").textContent="Your augmented prompt will appear here after retrieval.";
+ $("answerBox").textContent="Your generated answer will appear here. First retrieve context from the knowledge base.";
+ $("chunkCount").textContent="0";$("avgWords").textContent="0";$("overlapPct").textContent="0%";
+ $("evalRel").textContent="—";$("evalCoverage").textContent="—";$("evalGround").textContent="—";
+ $("evalNotes").innerHTML='<div class="timeline-item"><div class="timeline-icon">i</div><p><strong>Evaluation not run</strong>Generate an answer to see a heuristic assessment of the current run.</p></div>';
+ $("indexStatus").textContent="Index not built";$("indexStatus").className="status";
+ renderSources();updateCounts();updateTelemetry(0);document.querySelectorAll(".step").forEach((b,i)=>{b.classList.toggle("active",i===0);b.classList.remove("done")});
+ notify("Lab reset.");
+});
+renderSources();updateTelemetry(0);
+})();
+</script>
+</body>
+</html>
